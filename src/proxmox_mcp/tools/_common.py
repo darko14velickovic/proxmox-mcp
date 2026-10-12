@@ -1,6 +1,8 @@
 import functools
+import inspect
 import json
 import logging
+import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal, cast
@@ -174,6 +176,38 @@ def _describe(exc: Exception, where: str) -> str:
     return f"{type(exc).__name__}: {exc}"
 
 
+# These names become URL path components in proxmoxer, which splits string IDs on
+# '/' and joins them using posixpath.join(). Validate before constructing requests
+# so an MCP caller cannot escape the endpoint selected by the registered tool.
+_PATH_ARGUMENTS = frozenset({"node", "storage", "snapname", "upid"})
+_SAFE_PATH_SEGMENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]*\\Z")
+
+
+def _validate_path_arguments(fn: Callable[..., Any]) -> Callable[..., Any]:
+    signature = inspect.signature(fn)
+
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        bound = signature.bind(*args, **kwargs)
+        for name in _PATH_ARGUMENTS & bound.arguments.keys():
+            value = bound.arguments[name]
+            if value is None:
+                continue
+            if (
+                not isinstance(value, str)
+                or value in (".", "..")
+                or _SAFE_PATH_SEGMENT.fullmatch(value) is None
+            ):
+                raise ValueError(
+                    f"{name} must be a single safe Proxmox API path segment "
+                    "(ASCII letters, numbers, underscore, hyphen, dot or colon; "
+                    "no path separators, encoded separators or traversal)"
+                )
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
 def _wrap_errors(fn: Callable[..., Any]) -> Callable[..., Any]:
     """Re-raise anything the tool body throws as a ``ToolError`` the model can read."""
 
@@ -237,7 +271,9 @@ def make_gate(
             policy.seen.add(name)
             if not allowed_tier or (policy.allow is not None and name not in policy.allow):
                 return fn
-            body = fn if tier == "read" else _guard_tier(fn, name, tier)
+            body = _validate_path_arguments(fn)
+            if tier != "read":
+                body = _guard_tier(body, name, tier)
             policy.registered.add(name)
             return cast(Callable[..., Any], mcp.tool(**kwargs)(_wrap_errors(body)))
 
