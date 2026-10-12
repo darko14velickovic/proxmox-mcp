@@ -180,7 +180,7 @@ def _describe(exc: Exception, where: str) -> str:
 # '/' and joins them using posixpath.join(). Validate before constructing requests
 # so an MCP caller cannot escape the endpoint selected by the registered tool.
 _PATH_ARGUMENTS = frozenset({"node", "storage", "snapname", "upid"})
-_SAFE_PATH_SEGMENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:@-]*\\Z")
+_SAFE_PATH_SEGMENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:@-]*")
 
 
 def _validate_path_arguments(fn: Callable[..., Any]) -> Callable[..., Any]:
