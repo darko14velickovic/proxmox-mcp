@@ -180,7 +180,7 @@ def _describe(exc: Exception, where: str) -> str:
 # '/' and joins them using posixpath.join(). Validate before constructing requests
 # so an MCP caller cannot escape the endpoint selected by the registered tool.
 _PATH_ARGUMENTS = frozenset({"node", "storage", "snapname", "upid"})
-_SAFE_PATH_SEGMENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]*\\Z")
+_SAFE_PATH_SEGMENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:@-]*\\Z")
 
 
 def _validate_path_arguments(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -200,7 +200,7 @@ def _validate_path_arguments(fn: Callable[..., Any]) -> Callable[..., Any]:
             ):
                 raise ValueError(
                     f"{name} must be a single safe Proxmox API path segment "
-                    "(ASCII letters, numbers, underscore, hyphen, dot or colon; "
+                    "(ASCII letters, numbers, underscore, hyphen, dot, colon or at-sign; "
                     "no path separators, encoded separators or traversal)"
                 )
         return fn(*args, **kwargs)
