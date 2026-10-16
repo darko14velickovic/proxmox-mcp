@@ -40,6 +40,22 @@ jobs:
       - name: Pytest
         run: uv run pytest -v
 
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
+      - name: Export locked runtime dependencies
+        run: uv export --frozen --no-dev --extra sentry --no-emit-project --format requirements-txt --output-file requirements-audit.txt
+
+      - name: Audit dependencies for known vulnerabilities
+        run: uvx --from pip-audit pip-audit --disable-pip --no-deps -r requirements-audit.txt
+
   docker:
     runs-on: ubuntu-latest
     steps:
