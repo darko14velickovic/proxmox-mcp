@@ -29,7 +29,10 @@ from tests.conftest import RecordingProxmox, build_server, call_tool, make_conte
 )
 @pytest.mark.parametrize(
     "invalid",
-    [".", "..", "../status", "snapshot/../../", "/foo", "foo\\\\bar", "%2f", "%2e%2e", "foo?x", "foo#x", "", "foo bar"],
+    [
+        ".", "..", "../status", "snapshot/../../", "/foo", "foo\\\\bar",
+        "%2f", "%2e%2e", "foo?x", "foo#x", "", "foo bar",
+    ],
 )
 def test_dynamic_api_path_rejects_unsafe_segments(
     proxmox: RecordingProxmox,
