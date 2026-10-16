@@ -21,10 +21,17 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "mcp>=2.1",
+    "mcp>=2.2.0",
     "proxmoxer>=2.1",
     "requests>=2.32",
     "pydantic-settings>=2.9",
+]
+
+# Keep vulnerable transitive versions out of future lockfile resolutions.
+[tool.uv]
+constraint-dependencies = [
+    "pyjwt>=2.15.0",
+    "urllib3>=2.8.0",
 ]
 
 [project.optional-dependencies]
