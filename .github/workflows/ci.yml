@@ -11,6 +11,33 @@ permissions:
   contents: read
 
 jobs:
+  refresh-lock:
+    # Explicit one-off maintainer action. Never grants write permission to PR CI.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/security/supply-chain-audit' && github.actor == 'darko14velickovic'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: true
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
+      - name: Refresh vulnerable locked packages
+        run: uv lock --upgrade-package mcp --upgrade-package pyjwt --upgrade-package urllib3
+
+      - name: Commit updated lockfile
+        run: |
+          git diff --exit-code -- pyproject.toml || { echo "Unexpected pyproject.toml modification"; exit 1; }
+          git add uv.lock
+          if git diff --cached --quiet; then
+            echo "uv.lock is already up to date"
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'security: refresh patched locked dependencies'
+          git push origin HEAD:security/supply-chain-audit
+
   check:
     runs-on: ubuntu-latest
     steps:
