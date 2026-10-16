@@ -11,15 +11,42 @@ permissions:
   contents: read
 
 jobs:
+  refresh-lock:
+    # Explicit one-off maintainer action. Never grants write permission to PR CI.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/security/supply-chain-audit' && github.actor == 'darko14velickovic'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: true
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
+      - name: Refresh vulnerable locked packages
+        run: uv lock --upgrade-package mcp --upgrade-package pyjwt --upgrade-package urllib3
+
+      - name: Commit updated lockfile
+        run: |
+          git diff --exit-code -- pyproject.toml || { echo "Unexpected pyproject.toml modification"; exit 1; }
+          git add uv.lock
+          if git diff --cached --quiet; then
+            echo "uv.lock is already up to date"
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'security: refresh patched locked dependencies'
+          git push origin HEAD:security/supply-chain-audit
+
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           enable-cache: true
 
@@ -40,20 +67,36 @@ jobs:
       - name: Pytest
         run: uv run pytest -v
 
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
+      - name: Export locked runtime dependencies
+        run: uv export --frozen --no-dev --extra sentry --no-emit-project --format requirements-txt --output-file requirements-audit.txt
+
+      - name: Audit dependencies for known vulnerabilities
+        run: uvx --from pip-audit pip-audit --disable-pip --no-deps -r requirements-audit.txt
+
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       # Build only, no push: a broken Dockerfile should fail here rather than
       # halfway through a tagged release.
       - name: Build image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           push: false
